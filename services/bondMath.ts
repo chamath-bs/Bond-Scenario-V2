@@ -238,6 +238,40 @@ export const calculateBondPrice = (
 };
 
 /**
+ * Calculate Z-Spread (OAS) in Basis Points
+ * Solves for the parallel shift to the benchmark curve required to match the target price.
+ */
+export const calculateZSpread = (
+  bond: BondParameters,
+  benchmarkCurve: CurvePoint[],
+  targetPrice: number
+): number => {
+  let z = 0; // Shift in Percentage Points (e.g. 1.0 = 100bps)
+  const maxIter = 20;
+  const tol = 1e-6;
+
+  for (let i = 0; i < maxIter; i++) {
+    // Construct shifted curve
+    const curveZ = benchmarkCurve.map(p => ({ ...p, rate: p.rate + z }));
+    
+    const res = calculateBondPrice(bond, curveZ, 0);
+    const diff = res.dirtyPrice - targetPrice;
+    
+    if (Math.abs(diff) < tol) return z * 100; // Return in bps
+
+    // Derivative approximation: P' ~ -ModifiedDuration * Price * 0.01 (since z is in percent)
+    const modDur = res.duration / (1 + res.yieldToMaturity / 100);
+    const slope = -modDur * res.dirtyPrice * 0.01;
+
+    if (slope === 0) break;
+    
+    z = z - diff / slope;
+  }
+  
+  return z * 100; 
+};
+
+/**
  * Calculate Scenario Return with Decomposition
  */
 export const calculateTotalReturn = (
@@ -250,6 +284,7 @@ export const calculateTotalReturn = (
   // 1. Initial State (T0)
   const t0Result = calculateBondPrice(bond, curveT0, 0);
   const startPriceDirty = t0Result.dirtyPrice;
+  const startYTM = t0Result.yieldToMaturity;
 
   // 2. Final State (T1 - Actual Scenario)
   const t1Result = calculateBondPrice(bond, curveT1, horizonYears);
@@ -285,15 +320,28 @@ export const calculateTotalReturn = (
 
   // --- Price Return Decomposition ---
 
-  // A. Rolldown Price
+  // A. Pull to Par (New)
+  // Price at T=Horizon assuming yields haven't changed (Flat curve at initial YTM)
+  // CRITICAL FIX: startYTM is a Nominal rate (e.g. Semi-Annual). 
+  // calculateBondPrice expects curve rates to be Effective Annual Rates for discounting.
+  // We must convert Nominal YTM -> Effective Annual Rate.
+  const ytmDecimal = startYTM / 100;
+  const effectiveRateDecimal = Math.pow(1 + ytmDecimal / frequency, frequency) - 1;
+  const effectiveRatePercent = effectiveRateDecimal * 100;
+
+  // Create flat curve using Effective Annual Rate
+  const curvePullToPar = curveT0.map(p => ({ tenor: p.tenor, rate: effectiveRatePercent }));
+  const ptpResult = calculateBondPrice(bond, curvePullToPar, horizonYears);
+  const pricePullToParDirty = ptpResult.dirtyPrice;
+
+  // B. Full Rolldown Price (Existing Logic)
   // Price at T=Horizon using the ORIGINAL T0 Curve.
-  // This isolates the effect of "Time Passing" and "Rolling down the curve".
+  // This captures BOTH Pull to Par AND the effect of rolling down the curve.
   const rolldownResult = calculateBondPrice(bond, curveT0, horizonYears);
   const priceRolldownDirty = rolldownResult.dirtyPrice;
 
-  // B. Parallel Shift Price
+  // C. Parallel Shift Price
   // Price at T=Horizon using a Shifted T0 Curve.
-  // The shift is defined by the change in the Zero Rate at the bond's remaining maturity.
   const remainingMaturity = bond.maturityYears - horizonYears;
   let priceParallelDirty = priceRolldownDirty; 
   
@@ -308,20 +356,22 @@ export const calculateTotalReturn = (
     priceParallelDirty = parallelResult.dirtyPrice;
   }
 
-  // C. Components Calculation
+  // D. Components Calculation
   // Total Price Change = (End - Start)
-  // Decomposed:
-  // 1. Rolldown = (Price_Rolldown - Start)
-  // 2. Duration (Parallel) = (Price_Parallel - Price_Rolldown)
-  // 3. Shape (Residual) = (Price_End - Price_Parallel)
+  
+  // 1. Pull to Par = (Price_PtP - Start)
+  // 2. Pure Rolldown = (Price_Rolldown - Price_PtP)
+  // 3. Duration (Parallel) = (Price_Parallel - Price_Rolldown)
+  // 4. Shape (Residual) = (Price_End - Price_Parallel)
 
-  const rolldownDiff = priceRolldownDirty - startPriceDirty;
+  const pullToParDiff = pricePullToParDirty - startPriceDirty;
+  const rolldownDiff = priceRolldownDirty - pricePullToParDirty; // Pure Rolldown
   const durationDiff = priceParallelDirty - priceRolldownDirty;
   const shapeDiff = endPriceDirty - priceParallelDirty;
 
-  // Verify Sum
-  // rolldownDiff + durationDiff + shapeDiff 
-  // = (P_roll - Start) + (P_para - P_roll) + (P_end - P_para)
+  // Verify Sum: 
+  // PtP + Roll + Dur + Shape 
+  // = (P_ptp - Start) + (P_roll - P_ptp) + (P_para - P_roll) + (P_end - P_para)
   // = - Start + P_end = Total Price Change. Correct.
 
   // --- Totals ---
@@ -333,6 +383,7 @@ export const calculateTotalReturn = (
   const reinvestmentReturnComponent = reinvestmentIncome / startPriceDirty;
 
   // Decomposed Percentages
+  const pullToParReturnComponent = pullToParDiff / startPriceDirty;
   const rolldownReturnComponent = rolldownDiff / startPriceDirty;
   const durationReturnComponent = durationDiff / startPriceDirty;
   const convexityShapeReturnComponent = shapeDiff / startPriceDirty;
@@ -352,6 +403,7 @@ export const calculateTotalReturn = (
     priceReturnComponent: priceReturnComponent * 100,
     couponReturnComponent: couponReturnComponent * 100,
     reinvestmentReturnComponent: reinvestmentReturnComponent * 100,
+    pullToParReturnComponent: pullToParReturnComponent * 100,
     rolldownReturnComponent: rolldownReturnComponent * 100,
     durationReturnComponent: durationReturnComponent * 100,
     convexityShapeReturnComponent: convexityShapeReturnComponent * 100

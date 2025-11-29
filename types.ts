@@ -45,7 +45,8 @@ export interface TotalReturnResult {
   reinvestmentReturnComponent: number;
 
   // Price Return Decomposition
-  rolldownReturnComponent: number;
+  pullToParReturnComponent: number; // Accretion/Amortization at constant YTM
+  rolldownReturnComponent: number; // Marginal gain from sliding down the curve
   durationReturnComponent: number; // Due to parallel shift
   convexityShapeReturnComponent: number; // Due to curve reshaping
 }

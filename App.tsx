@@ -12,7 +12,7 @@ import {
   SPREAD_PRESETS,
   COLORS 
 } from './constants';
-import { calculateBondPrice, calculateTotalReturn } from './services/bondMath';
+import { calculateBondPrice, calculateTotalReturn, calculateZSpread } from './services/bondMath';
 import ScenarioChart from './components/ScenarioChart';
 import { Settings, BarChart3, TrendingUp, Sliders, ArrowRight, Activity } from 'lucide-react';
 
@@ -128,6 +128,8 @@ function App() {
 
   const t0Price = useMemo(() => calculateBondPrice(bond, totalCurveT0, 0), [bond, totalCurveT0]);
   
+  const zSpread = useMemo(() => calculateZSpread(bond, curveT0, t0Price.dirtyPrice), [bond, curveT0, t0Price]);
+
   const results = useMemo(() => 
     calculateTotalReturn(bond, totalCurveT0, totalCurveT1, horizonYears), 
     [bond, totalCurveT0, totalCurveT1, horizonYears]
@@ -242,10 +244,14 @@ function App() {
                 </InputGroup>
               </div>
               
-              <div className="mt-6 pt-4 border-t border-betashares-lightgrey">
-                 <div className="flex justify-between items-center mb-2">
+              <div className="mt-4 pt-4 border-t border-betashares-lightgrey space-y-2">
+                 <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-betashares-grey">TOTAL YIELD (YTM)</span>
                     <span className="text-sm font-mono font-bold text-betashares-black">{t0Price.yieldToMaturity.toFixed(2)}%</span>
+                 </div>
+                 <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-betashares-grey">OAS / Z-SPREAD</span>
+                    <span className="text-sm font-mono font-bold text-betashares-black">{zSpread.toFixed(0)} bps</span>
                  </div>
                  <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-betashares-grey">DURATION</span>
@@ -440,11 +446,18 @@ function App() {
                       {/* Price Decomposition Sub-items */}
                       <div className="pl-4 border-l border-gray-200 ml-4 space-y-2 my-2">
                          <ReturnBar 
+                           label="Pull to Par" 
+                           value={results.pullToParReturnComponent} 
+                           colorClass="bg-gray-500"
+                           isSubItem
+                           subtext="Amortization"
+                         />
+                         <ReturnBar 
                            label="Rolldown" 
                            value={results.rolldownReturnComponent} 
                            colorClass="bg-gray-500"
                            isSubItem
-                           subtext="Time + Curve Decay"
+                           subtext="Curve Slide"
                          />
                          <ReturnBar 
                            label="Duration" 

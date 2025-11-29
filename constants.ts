@@ -13,12 +13,12 @@ export const COLORS = {
 };
 
 export const DEFAULT_CURVE_POINTS = [
-  { tenor: 0, rate: 4.35 }, // Overnight
-  { tenor: 2, rate: 4.10 },
-  { tenor: 5, rate: 4.25 },
+  { tenor: 0, rate: 3.60 }, // Overnight
+  { tenor: 2, rate: 3.80 },
+  { tenor: 5, rate: 4.00 },
   { tenor: 10, rate: 4.50 },
-  { tenor: 20, rate: 4.80 },
-  { tenor: 30, rate: 4.95 }
+  { tenor: 20, rate: 5.10 },
+  { tenor: 30, rate: 5.30 }
 ];
 
 export const SPREAD_PRESETS = {
@@ -31,7 +31,7 @@ export const SPREAD_PRESETS = {
     { tenor: 30, rate: 0 }
   ],
   AA: [
-    { tenor: 0, rate: 30 },
+    { tenor: 0, rate: 10 },
     { tenor: 2, rate: 45 },
     { tenor: 5, rate: 60 },
     { tenor: 10, rate: 75 },
@@ -39,7 +39,7 @@ export const SPREAD_PRESETS = {
     { tenor: 30, rate: 90 }
   ],
   A: [
-    { tenor: 0, rate: 50 },
+    { tenor: 0, rate: 20 },
     { tenor: 2, rate: 70 },
     { tenor: 5, rate: 90 },
     { tenor: 10, rate: 110 },
@@ -47,7 +47,7 @@ export const SPREAD_PRESETS = {
     { tenor: 30, rate: 130 }
   ],
   BBB: [
-    { tenor: 0, rate: 85 },
+    { tenor: 0, rate: 40 },
     { tenor: 2, rate: 110 },
     { tenor: 5, rate: 135 },
     { tenor: 10, rate: 150 },
