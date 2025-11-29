@@ -1,0 +1,5 @@
+{
+  "name": "Bond Scenario Analyst V2",
+  "description": "A professional bond scenario analysis tool allowing users to simulate yield curve changes and analyse total return decomposition.",
+  "requestFramePermissions": []
+}
